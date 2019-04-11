@@ -25,8 +25,11 @@ if ( !defined( 'ABSPATH' ) ) {
 class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
 {
 
-    const TEST_PAYGATE_ID     = '10011072130';
-    const TEST_ENCRYPTION_KEY = 'secret';
+    protected static $_instance = null;
+    private static $log;
+
+    const TEST_PAYGATE_ID = '10011072130';
+    const TEST_SECRET_KEY = 'secret';
 
     public $version = '3.5.5';
 
@@ -41,6 +44,14 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
     private $data_to_send;
 
     private $msg;
+
+    public static function instance()
+    {
+        if ( is_null( self::$_instance ) ) {
+            self::$_instance = new self();
+        }
+        return self::$_instance;
+    }
 
     public function __construct()
     {
@@ -80,6 +91,9 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
             'check_paysubs2_response',
         ) );
 
+        add_action( 'wp_ajax_order_pay_payment', array( $this, 'process_review_payment' ) );
+        add_action( 'wp_ajax_nopriv_order_pay_payment', array( $this, 'process_review_payment' ) );
+
         if ( version_compare( WOOCOMMERCE_VERSION, '2.0.0', '>=' ) ) {
             add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array(
                 &$this,
@@ -92,10 +106,48 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
             ) );
         }
 
+        add_action( 'wp_enqueue_scripts', array( $this, 'paygate_payment_scripts' ) );
+
         add_action( 'woocommerce_receipt_paysubs2', array(
             $this,
             'receipt_page',
         ) );
+    }
+
+    public function get_order_id_order_pay()
+    {
+        global $wp;
+
+        // Get the order ID
+        $order_id = absint( $wp->query_vars['order-pay'] );
+
+        if ( empty( $order_id ) || $order_id == 0 ) {
+            return;
+        }
+        // Exit;
+        return $order_id;
+    }
+
+    /**
+     * Add payment scripts for iFrame support
+     *
+     * @since 1.0.0
+     */
+    public function paygate_payment_scripts()
+    {
+        wp_enqueue_script( 'paygate-checkout-js', $this->get_plugin_url() . '/assets/js/paygate_checkout.js', array(), WC_VERSION, true );
+        if ( is_wc_endpoint_url( 'order-pay' ) ) {
+            wp_localize_script( 'paygate-checkout-js', 'paygate_checkout_js', array(
+                'order_id' => $this->get_order_id_order_pay(),
+            ) );
+
+        } else {
+            wp_localize_script( 'paygate-checkout-js', 'paygate_checkout_js', array(
+                'order_id' => 0,
+            ) );
+        }
+
+        wp_enqueue_style( 'paygate-checkout-css', $this->get_plugin_url() . '/assets/css/paygate_checkout.css', array(), WC_VERSION );
     }
 
     /**
@@ -144,16 +196,6 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
     }
 
     /**
-     * @param $resultDescription string
-     */
-    public function declined_msg( $resultDescription )
-    {
-        echo '<p class="woocommerce-thankyou-order-failed">';
-        _e( $resultDescription, 'woocommerce' );
-        echo '</p>';
-    }
-
-    /**
      * Initialise Gateway Settings Form Fields
      *
      * @since 1.0.0
@@ -175,7 +217,7 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
                 'type'        => 'text',
                 'description' => __( 'This controls the title which the user sees during checkout.', 'paysubs2' ),
                 'desc_tip'    => false,
-                'default'     => __( 'PaySubs2 Payment Gateway', 'paysubs2' ),
+                'default'     => __( 'Recurring Payment Gateway', 'paysubs2' ),
             ),
             'paygate_id'     => array(
                 'title'       => __( 'PayGate ID', 'paysubs2' ),
@@ -342,10 +384,21 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
                     '+100 year' => 'Expire in 100 years',
                 ),
             ),
+            'payment_type'   => array(
+                'title'       => __( 'Implementation', 'woocommerce_gateway_paysubs' ),
+                'label'       => __( 'Choose Payment Type', 'woocommerce_gateway_paysubs' ),
+                'type'        => 'select',
+                'description' => 'Whether to use the Redirect or iFrame implementation.',
+                'default'     => 'redirect',
+                'options'     => array(
+                    'redirect' => 'Redirect',
+                    'iframe'   => 'iFrame',
+                ),
+            ),
             'testmode'       => array(
                 'title'       => __( 'Test mode', 'paysubs2' ),
                 'type'        => 'checkbox',
-                'description' => __( 'Uses a PaySubs2 test account. Request test cards from PayGate', 'paysubs2' ),
+                'description' => __( 'Uses a PaySubs2 test account. Request test cards from PayGate.', 'paysubs2' ),
                 'desc_tip'    => true,
                 'default'     => 'yes',
             ),
@@ -353,13 +406,13 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
                 'title'       => __( 'Description', 'paysubs2' ),
                 'type'        => 'textarea',
                 'description' => __( 'This controls the description which the user sees during checkout.', 'paysubs2' ),
-                'default'     => 'Pay via PaySubs2',
+                'default'     => 'Pay via Credit or Debit Card',
             ),
             'button_text'    => array(
                 'title'       => __( 'Order Button Text', 'paysubs2' ),
                 'type'        => 'text',
-                'description' => __( 'Changes the text that appears on the Place Order button', 'paysubs2' ),
-                'default'     => 'Proceed to PaySubs2',
+                'description' => __( 'Changes the text that appears on the Place Order button.', 'paysubs2' ),
+                'default'     => 'Proceed to PayGate',
             ),
         );
 
@@ -406,35 +459,30 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
     }
 
     /**
-     * Generate the PaySubs2 button link.
+     * Fetch required fields for PaySubs2
      *
-     * @since 1.0.0
-     *
-     * @param $order_id
-     *
-     * @return string
+     * @since 1.0.1
      */
-    public function generate_paysubs2_form( $order_id )
+    public function fetch_payment_params( $order_id )
     {
+
         $order = new WC_Order( $order_id );
 
-        $messageText = esc_js( __( 'Thank you for your order. We are now redirecting you to PaySubs2 to make payment.', 'paysubs2' ) );
-
-        $heading    = __( 'Thank you for your order, please click the button below to pay via PaySubs.', 'paysubs2' );
-        $buttonText = __( $this->order_button_text, 'paysubs2' );
-        $cancelUrl  = esc_url( $order->get_cancel_order_url() );
-        $cancelText = __( 'Cancel order &amp; restore cart', 'paysubs2' );
+        if ( $this->settings['testmode'] == 'yes' ) {
+            $this->merchant_id    = self::TEST_PAYGATE_ID;
+            $this->encryption_key = self::TEST_SECRET_KEY;
+        }
 
         $encryptionKey = $this->encryption_key;
 
         $data = array(
             'VERSION'          => 21,
             'PAYGATE_ID'       => $this->merchant_id,
-            'REFERENCE'        => 'payment_' . $order_id,
+            'REFERENCE'        => 'order-id_' . $order_id . '_order-number_' . $order->get_order_number(),
             'AMOUNT'           => $order->get_total() * 100,
             'CURRENCY'         => 'ZAR',
             'RETURN_URL'       => $this->redirect_url,
-            'TRANSACTION_DATE' => $order->get_date_created(),
+            'TRANSACTION_DATE' => date( 'Y-m-d', $order->get_date_created()->getOffsetTimestamp() ),
         );
 
         // Processing subscription
@@ -484,7 +532,7 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
             // End subscription
         } else {
 
-            $data['SUBS_START_DATE'] = date( 'Y-m-d', strtotime( $order->get_date_created() ) );
+            $data['SUBS_START_DATE'] = date( 'Y-m-d', $order->get_date_created()->getOffsetTimestamp() );
             $data['SUBS_END_DATE']   = date( 'Y-m-d', strtotime( $this->settings['subsenddate'] ) );
             $data['SUBS_FREQUENCY']  = $this->settings['frequency'];
         }
@@ -492,8 +540,33 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
         $data['PROCESS_NOW']        = 'YES';
         $data['PROCESS_NOW_AMOUNT'] = $order->get_total() * 100;
 
-        $checksum = md5( implode( '|', $data ) . '|' . $encryptionKey );
-        $value    = "";
+        $checksum         = md5( implode( '|', $data ) . '|' . $this->encryption_key );
+        $data['CHECKSUM'] = $checksum;
+        return $data;
+    }
+
+    /**
+     * Generate the PaySubs2 button link.
+     *
+     * @since 1.0.0
+     *
+     * @param $order_id
+     *
+     * @return string
+     */
+    public function generate_paysubs2_form( $order_id )
+    {
+        $order = new WC_Order( $order_id );
+
+        $messageText = esc_js( __( 'Thank you for your order. We are now redirecting you to PayGate to make payment.', 'paysubs2' ) );
+
+        $heading    = __( 'Thank you for your order, please click the button below to pay via PayGate.', 'paysubs2' );
+        $buttonText = __( $this->order_button_text, 'paysubs2' );
+        $cancelUrl  = esc_url( $order->get_cancel_order_url() );
+        $cancelText = __( 'Cancel order &amp; restore cart', 'paysubs2' );
+
+        $data  = $this->fetch_payment_params( $order_id );
+        $value = "";
         foreach ( $data as $index => $v ) {
 
             $value .= '<input type="hidden" name="' . $index . '" value="' . $v . '" />';
@@ -503,7 +576,6 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
 <p>{$heading}</p>
 <form action="{$this->process_url}" method="post" id="paysubs2_payment_form">
     {$value}
-    <input name="CHECKSUM" type="hidden" value="{$checksum}" />
     <!-- Button Fallback -->
     <div class="payment_buttons">
         <input type="submit" class="button alt" id="submit_paysubs2_payment_form" value="{$buttonText}" /> <a class="button cancel" href="{$cancelUrl}">{$cancelText}</a>
@@ -549,49 +621,20 @@ HTML;
      */
     public function process_payment( $order_id )
     {
-        $order = new WC_Order( $order_id );
+        if ( $this->settings['payment_type'] == 'redirect' ) {
+            $order = new WC_Order( $order_id );
 
-        return array(
-            'result'   => 'success',
-            'redirect' => $order->get_checkout_payment_url( true ),
-        );
+            return array(
+                'result'   => 'success',
+                'redirect' => $order->get_checkout_payment_url( true ),
+            );
 
-    }
-
-    /**
-     * Does the initiate to PaySubs2
-     *
-     * @param $order_id
-     *
-     * @return array|WP_Error
-     */
-    public function initiate_transaction( $order_id )
-    {
-        $order = new WC_Order( $order_id );
-
-        unset( $this->data_to_send );
-
-        if ( $this->settings['testmode'] == 'yes' ) {
-            $this->merchant_id    = self::TEST_PAYGATE_ID;
-            $this->encryption_key = self::TEST_ENCRYPTION_KEY;
+        } else {
+            $result = $this->fetch_payment_params( $order_id );
+            echo json_encode( $result );
+            die;
         }
 
-        // Construct variables for post
-        $order_total        = $order->get_total();
-        $this->data_to_send = array(
-            'PAYGATE_ID'       => $this->merchant_id,
-            'REFERENCE'        => $order->get_id() . '-' . $order->get_order_number(),
-            'AMOUNT'           => number_format( $order_total, 2, '', '' ),
-            'CURRENCY'         => get_woocommerce_currency(),
-            'RETURN_URL'       => $this->redirect_url . '&gid=' . $order_id,
-            'TRANSACTION_DATE' => date( 'Y-m-d H:m:s' ),
-            'LOCALE'           => 'en-za',
-            'COUNTRY'          => 'ZAF',
-            'EMAIL'            => $order->get_billing_email(),
-            'USER3'            => 'woocommerce-v' . $this->version,
-        );
-
-        $this->data_to_send['CHECKSUM'] = md5( implode( '', $this->data_to_send ) . $this->encryption_key );
     }
 
     /**
@@ -605,12 +648,7 @@ HTML;
      */
     public function receipt_page( $order )
     {
-        $return = $this->initiate_transaction( $order );
-        if ( is_wp_error( $return ) ) {
-            echo $return->get_error_message();
-        } else {
-            echo $this->generate_paysubs2_form( $order );
-        }
+        echo $this->generate_paysubs2_form( $order );
     }
 
     /**
@@ -636,11 +674,17 @@ HTML;
                         //Success
                         $order->payment_complete();
                         $order->add_order_note( __( 'Response via Redirect, Transaction successful', 'woocommerce' ) );
-                        $order->reduce_order_stock();
 
                         // Empty the cart
-                        WC()->cart->empty_cart();
-                        wp_redirect( $this->get_return_url( $order ) );
+                        $woocommerce->cart->empty_cart();
+                        if ( $this->settings['payment_type'] == 'redirect' ) {
+                            wp_redirect( $this->get_return_url( $order ) );
+                        } else {
+
+                            $redirect_link = $this->get_return_url( $order );
+
+                            echo '<script>window.top.location.href="' . $redirect_link . '";</script>';
+                        }
                         exit;
                     } else {
 
@@ -648,7 +692,14 @@ HTML;
                         if ( !$order->has_status( 'failed' ) ) {
                             $order->update_status( 'failed' );
                         }
-                        wp_redirect( $this->get_return_url( $order ) );
+                        if ( $this->settings['payment_type'] == 'redirect' ) {
+                            $this->add_notice( 'Your order was cancelled.', 'notice' );
+                            wp_redirect( $order->get_cancel_order_url() );
+                        } else {
+
+                            $redirect_link = htmlspecialchars_decode( urldecode( $order->get_cancel_order_url() ) );
+                            echo '<script>window.top.location.href="' . $redirect_link . '";</script>';
+                        }
                         exit;
                     }
                 }
@@ -675,17 +726,32 @@ HTML;
         }
     }
 
+    public function process_review_payment()
+    {
+        if ( !empty( $_POST['order_id'] ) ) {
+            $this->process_payment( $_POST['order_id'] );
+        }
+    }
+
     /**
      * Debug logger
      *
      * @since 1.1.3
      */
-    public function write_log( $log )
+
+    public static function log( $message )
     {
-        if ( is_array( $log ) || is_object( $log ) ) {
-            error_log( print_r( $log, true ) );
-        } else {
-            error_log( $log );
+
+        if ( empty( self::$log ) ) {
+
+            self::$log = new WC_Logger();
+        }
+
+        self::$log->add( 'Paysubs', $message );
+
+        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+
+            error_log( $message );
         }
     }
 }
