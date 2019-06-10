@@ -31,7 +31,7 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
     const TEST_PAYGATE_ID = '10011072130';
     const TEST_SECRET_KEY = 'secret';
 
-    public $version = '3.5.5';
+    public $version = '3.6.4';
 
     public $id = 'paysubs2';
 
@@ -204,7 +204,7 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
     {
 
         $this->form_fields = array(
-            'enabled'        => array(
+            'enabled'              => array(
                 'title'       => __( 'Enable/Disable', 'paysubs2' ),
                 'label'       => __( 'Enable PaySubs2 Payment Gateway', 'paysubs2' ),
                 'type'        => 'checkbox',
@@ -212,28 +212,28 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
                 'desc_tip'    => true,
                 'default'     => 'no',
             ),
-            'title'          => array(
+            'title'                => array(
                 'title'       => __( 'Title', 'paysubs2' ),
                 'type'        => 'text',
                 'description' => __( 'This controls the title which the user sees during checkout.', 'paysubs2' ),
                 'desc_tip'    => false,
                 'default'     => __( 'Recurring Payment Gateway', 'paysubs2' ),
             ),
-            'paygate_id'     => array(
+            'paygate_id'           => array(
                 'title'       => __( 'PayGate ID', 'paysubs2' ),
                 'type'        => 'text',
                 'description' => __( 'This is the PayGate ID, received from PayGate.', 'paysubs2' ),
                 'desc_tip'    => true,
                 'default'     => '',
             ),
-            'encryption_key' => array(
+            'encryption_key'       => array(
                 'title'       => __( 'Encryption Key', 'paysubs2' ),
                 'type'        => 'text',
                 'description' => __( 'This is the Encryption Key set in the PayGate Back Office.', 'paysubs2' ),
                 'desc_tip'    => true,
                 'default'     => '',
             ),
-            'frequency'      => array(
+            'frequency'            => array(
                 'title'       => __( 'Payment Frequency', 'woocommerce_gateway_paysubs' ),
                 'label'       => __( 'Choose Payment Frequency', 'woocommerce_gateway_paysubs' ),
                 'type'        => 'select',
@@ -350,7 +350,7 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
                     '429' => 'Every 3rd month on last day of the month',
                 ),
             ),
-            'subsenddate'    => array(
+            'subsenddate'          => array(
                 'title'       => __( 'Subs End Date', 'woocommerce_gateway_paysubs' ),
                 'label'       => __( 'Choose Subs End Date', 'woocommerce_gateway_paysubs' ),
                 'type'        => 'select',
@@ -384,7 +384,7 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
                     '+100 year' => 'Expire in 100 years',
                 ),
             ),
-            'payment_type'   => array(
+            'payment_type'         => array(
                 'title'       => __( 'Implementation', 'woocommerce_gateway_paysubs' ),
                 'label'       => __( 'Choose Payment Type', 'woocommerce_gateway_paysubs' ),
                 'type'        => 'select',
@@ -395,23 +395,53 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
                     'iframe'   => 'iFrame',
                 ),
             ),
-            'testmode'       => array(
-                'title'       => __( 'Test mode', 'paysubs2' ),
+            'specify_amount'       => array(
+                'title'       => __( 'Enable Specify Amount', 'woocommerce_gateway_paysubs' ),
                 'type'        => 'checkbox',
-                'description' => __( 'Uses a PaySubs2 test account. Request test cards from PayGate.', 'paysubs2' ),
+                'description' => __( 'Choose if a specific value can be used for the AMOUNT or PROCESS_NOW_AMOUNT', 'woocommerce_gateway_paysubs' ),
+                'desc_tip'    => true,
+                'default'     => 'no',
+            ),
+            'specify_amount_value' => array(
+                'title'       => __( 'Enable Specific Amount', 'woocommerce_gateway_paysubs' ),
+                'type'        => 'checkbox',
+                'description' => __( 'Choose if a specific value can be used for the AMOUNT or PROCESS_NOW_AMOUNT', 'woocommerce_gateway_paysubs' ),
+                'desc_tip'    => true,
+                'default'     => 'no',
+
+                'title'       => __( 'Set Specific Amount (cents)', 'woocommerce_gateway_paysubs' ),
+                'type'        => 'text',
+                'description' => __( 'Sets a specific amount in cents (if Specific Amount is enabled).', 'woocommerce_gateway_paysubs' ),
+                'default'     => '10000',
+            ),
+            'product_price'        => array(
+                'title'       => __( 'Product Price', 'woocommerce_gateway_paysubs' ),
+                'label'       => __( 'Choose Product Price', 'woocommerce_gateway_paysubs' ),
+                'type'        => 'select',
+                'description' => 'Choose if product price should be passed as the AMOUNT or the PROCESS_NOW_AMOUNT (if Specific Amount is enabled).',
+                'default'     => 'process_now_amount',
+                'options'     => array(
+                    'amount'             => 'AMOUNT (recurring amount)',
+                    'process_now_amount' => 'PROCESS_NOW_AMOUNT (initial amount)',
+                ),
+            ),
+            'testmode'             => array(
+                'title'       => __( 'Test mode', 'woocommerce_gateway_paysubs' ),
+                'type'        => 'checkbox',
+                'description' => __( 'Uses a PaySubs2 test account. Request test cards from PayGate.', 'woocommerce_gateway_paysubs' ),
                 'desc_tip'    => true,
                 'default'     => 'yes',
             ),
-            'description'    => array(
-                'title'       => __( 'Description', 'paysubs2' ),
+            'description'          => array(
+                'title'       => __( 'Description', 'woocommerce_gateway_paysubs' ),
                 'type'        => 'textarea',
-                'description' => __( 'This controls the description which the user sees during checkout.', 'paysubs2' ),
+                'description' => __( 'This controls the description which the user sees during checkout.', 'woocommerce_gateway_paysubs' ),
                 'default'     => 'Pay via Credit or Debit Card',
             ),
-            'button_text'    => array(
-                'title'       => __( 'Order Button Text', 'paysubs2' ),
+            'button_text'          => array(
+                'title'       => __( 'Order Button Text', 'woocommerce_gateway_paysubs' ),
                 'type'        => 'text',
-                'description' => __( 'Changes the text that appears on the Place Order button.', 'paysubs2' ),
+                'description' => __( 'Changes the text that appears on the Place Order button.', 'woocommerce_gateway_paysubs' ),
                 'default'     => 'Proceed to PayGate',
             ),
         );
@@ -537,8 +567,24 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
             $data['SUBS_FREQUENCY']  = $this->settings['frequency'];
         }
 
-        $data['PROCESS_NOW']        = 'YES';
-        $data['PROCESS_NOW_AMOUNT'] = $order->get_total() * 100;
+        $data['PROCESS_NOW'] = 'YES';
+        if ( $this->settings['specify_amount'] == 'yes' ) {
+            // Specify Amount is enabled
+            $specify_amount_value = $this->settings['specify_amount_value'];
+
+            if ( $this->settings['product_price'] == 'amount' ) {
+                // Product Price set to AMOUNT
+                $data['AMOUNT']             = $order->get_total() * 100;
+                $data['PROCESS_NOW_AMOUNT'] = $specify_amount_value;
+            } else {
+                // Product Price set to PROCESS_NOW_AMOUNT
+                $data['AMOUNT']             = $specify_amount_value;
+                $data['PROCESS_NOW_AMOUNT'] = $order->get_total() * 100;
+            }
+        } else {
+            // Specify Amount is disabled
+            $data['PROCESS_NOW_AMOUNT'] = $order->get_total() * 100;
+        }
 
         $checksum         = md5( implode( '|', $data ) . '|' . $this->encryption_key );
         $data['CHECKSUM'] = $checksum;

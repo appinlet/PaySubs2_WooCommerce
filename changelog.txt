@@ -1,3 +1,8 @@
+= 1.0.2 - June 10, 2019 =
+
+* Add PROCESS_NOW and PROCESS_NOW_AMOUNT functionality.
+* Add product price toggle for AMOUNT / PROCESS_NOW_AMOUNT
+
 = 1.0.1 - April 11, 2019 =
 
 * Allow for either iFrame or Redirect implementation
