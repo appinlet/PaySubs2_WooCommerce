@@ -5,6 +5,7 @@ This is the DPO PayGate PaySubs2 plugin for WooCommerce. Please feel free to con
 
 ## Installation
 Please navigate to the [releases page](https://github.com/PayGate/PaySubs2_WooCommerce/releases), download the latest release (v1.0.2) and unzip. You will them be able to follow the integration guide PDF which is included in the zip.
+[![How To Setup DPO | PayGate PayWeb for WooCommerce](https://www.appinlet.com/wp-content/uploads/2019/04/WooCommerce-PaySubs2-Integration.jpg)](https://www.youtube.com/watch?v=Ko5eessWrWU "How To Setup DPO | PayGate PaySubs2 for WooCommerce")
 
 ## Collaboration
 
