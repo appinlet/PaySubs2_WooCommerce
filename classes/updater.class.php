@@ -1,7 +1,7 @@
 <?php
 
 // Prevent loading this file directly and/or if the class is already defined
-if ( !defined( 'ABSPATH' ) || class_exists( 'WPGitHubUpdater' ) || class_exists( 'WP_GitHub_Updater_PS2' ) ) {
+if ( !defined( 'ABSPATH' ) || class_exists( 'WPGitHubUpdaterPS2' ) || class_exists( 'WP_GitHub_Updater_PS2' ) ) {
     return;
 }
 
@@ -431,14 +431,18 @@ class WP_GitHub_Updater_PS2
      */
     public function get_changelog()
     {
-        $_changelog = $this->remote_get( $this->config['raw_url'] . '/changelog.txt' );
-        if ( is_wp_error( $_changelog ) ) {
-            return 'Could not get changelog from server.';
+        $_changelog = '';
+        if ( !is_wp_error( $this->config ) ) {
+            $_changelog = $this->remote_get( $this->config['raw_url'] . '/changelog.txt' );
         }
-
-        $_changelog = nl2br( $_changelog['body'] );
+        if ( !is_wp_error( $_changelog ) ) {
+            $_changelog = nl2br( $_changelog['body'] );
+        } else {
+            $_changelog = '';
+        }
         // return
         return ( !empty( $_changelog ) ? $_changelog : 'Could not get changelog from server.' );
+
     }
 
     /**
