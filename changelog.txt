@@ -1,3 +1,7 @@
+= 1.0.3 - June 24, 2019 =
+
+* WooCommerce Subscriptions bug fix.
+
 = 1.0.2 - June 10, 2019 =
 
 * Add PROCESS_NOW and PROCESS_NOW_AMOUNT functionality.

@@ -4,7 +4,7 @@
  * Plugin Name: PayGate PaySubs2 plugin for WooCommerce
  * Plugin URI: https://github.com/PayGate/PaySubs2_WooCommerce
  * Description: Accept payments for WooCommerce using PayGate's PaySubs2 service
- * Version: 1.0.2
+ * Version: 1.0.3
  * Tested: 5.2.1
  * Author: PayGate (Pty) Ltd
  * Author URI: https://www.paygate.co.za/

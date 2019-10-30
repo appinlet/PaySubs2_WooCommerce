@@ -516,56 +516,9 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
         );
 
         // Processing subscription
-        if (  ( function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $order_id ) ) || ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order_id ) ) ) {
-
-            $subscriptions = wcs_get_subscriptions_for_order( $order );
-
-            $subscription = array_pop( $subscriptions );
-
-            $unconverted_periods = array(
-                'billing_period' => $subscription->billing_period,
-                'trial_period'   => $subscription->trial_period,
-            );
-
-            $converted_periods = array();
-
-            // Convert period strings into PayPay's format
-            foreach ( $unconverted_periods as $key => $period ) {
-                switch ( strtolower( $period ) ) {
-                    case 'day':
-                        $converted_periods[$key] = 'day';
-                        break;
-                    case 'week':
-                        $converted_periods[$key] = 'week';
-                        break;
-                    case 'year':
-                        $converted_periods[$key] = 'year';
-                        break;
-                    case 'month':
-                    default:
-                        $converted_periods[$key] = 'month';
-                        break;
-                }
-            }
-
-            $data['SUBS_START_DATE'] = $subscription->get_time( 'start' );
-            $data['SUBS_END_DATE']   = $subscription->get_time( 'end' );
-
-            if ( $converted_periods['billing_period'] == 'day' ) {
-                $data['SUBS_FREQUENCY'] = 111;
-            } else if ( $converted_periods['billing_period'] == 'week' ) {
-                $data['SUBS_FREQUENCY'] = 121;
-            } else {
-                $data['SUBS_FREQUENCY'] = 228;
-            }
-
-            // End subscription
-        } else {
-
-            $data['SUBS_START_DATE'] = date( 'Y-m-d', $order->get_date_created()->getOffsetTimestamp() );
-            $data['SUBS_END_DATE']   = date( 'Y-m-d', strtotime( $this->settings['subsenddate'] ) );
-            $data['SUBS_FREQUENCY']  = $this->settings['frequency'];
-        }
+        $data['SUBS_START_DATE'] = date( 'Y-m-d', $order->get_date_created()->getOffsetTimestamp() );
+        $data['SUBS_END_DATE']   = date( 'Y-m-d', strtotime( $this->settings['subsenddate'] ) );
+        $data['SUBS_FREQUENCY']  = $this->settings['frequency'];
 
         $data['PROCESS_NOW'] = 'YES';
         if ( $this->settings['specify_amount'] == 'yes' ) {
