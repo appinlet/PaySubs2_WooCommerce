@@ -112,6 +112,7 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
             $this,
             'receipt_page',
         ) );
+
     }
 
     public function get_order_id_order_pay()
@@ -166,11 +167,11 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
      *
      * Display message depending on order results.
      *
-     * @since 1.0.0
-     *
      * @param $content
      *
      * @return string
+     * @since 1.0.0
+     *
      */
     public function show_message( $content )
     {
@@ -461,7 +462,8 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
         <p><?php printf( __( 'PaySubs2 works by sending the user to %sPayGate%s to enter their payment information.', 'paysubs2' ), '<a href="https://www.paygate.co.za/">', '</a>' );?></p>
 
         <table class="form-table">
-            <?php $this->generate_settings_html(); // Generate the HTML For the settings form. ?>
+            <?php $this->generate_settings_html(); // Generate the HTML For the settings form.
+        ?>
         </table><!--/.form-table-->
         <?php
 }
@@ -496,7 +498,8 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
     public function fetch_payment_params( $order_id )
     {
 
-        $order = new WC_Order( $order_id );
+        $order    = wc_get_order( $order_id );
+        $settings = $this->settings;
 
         if ( $this->settings['testmode'] == 'yes' ) {
             $this->merchant_id    = self::TEST_PAYGATE_ID;
@@ -504,8 +507,7 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
         }
 
         $encryptionKey = $this->encryption_key;
-
-        $data = array(
+        $data          = array(
             'VERSION'          => 21,
             'PAYGATE_ID'       => $this->merchant_id,
             'REFERENCE'        => 'order-id_' . $order_id . '_order-number_' . $order->get_order_number(),
@@ -515,28 +517,50 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
             'TRANSACTION_DATE' => date( 'Y-m-d', $order->get_date_created()->getOffsetTimestamp() ),
         );
 
-        // Processing subscription
-        $data['SUBS_START_DATE'] = date( 'Y-m-d', $order->get_date_created()->getOffsetTimestamp() );
-        $data['SUBS_END_DATE']   = date( 'Y-m-d', strtotime( $this->settings['subsenddate'] ) );
-        $data['SUBS_FREQUENCY']  = $this->settings['frequency'];
+        foreach ( $order->get_items() as $item_id => $item ) {
+            $product_id   = $item->get_product_id();
+            $product_data = get_post_meta( $product_id );
+        }
 
-        $data['PROCESS_NOW'] = 'YES';
-        if ( $this->settings['specify_amount'] == 'yes' ) {
-            // Specify Amount is enabled
-            $specify_amount_value = $this->settings['specify_amount_value'];
-
-            if ( $this->settings['product_price'] == 'amount' ) {
-                // Product Price set to AMOUNT
-                $data['AMOUNT']             = $order->get_total() * 100;
-                $data['PROCESS_NOW_AMOUNT'] = $specify_amount_value;
+        if ( $product_data['ps2_use_product_meta'][0] == 'on' && count( $order->get_items() ) == 1 ) {
+            //Product is set to recurring. Get product overrides
+            $data['SUBS_START_DATE'] = date( 'Y-m-d', $order->get_date_created()->getOffsetTimestamp() );
+            $ps2_sub_end_date        = date_create( $data['SUBS_START_DATE'] );
+            $ps2_sub_end_date->modify( $product_data['ps2_expire_interval'][0] );
+            $data['SUBS_END_DATE']  = $ps2_sub_end_date->format( 'Y-m-d' );
+            $data['SUBS_FREQUENCY'] = $product_data['ps2_recur_freq'][0];
+            if ( isset( $product_data['ps2_process_now_amount'] ) && floatval( $product_data['ps2_process_now_amount'][0] ) > 0 ) {
+                $data['PROCESS_NOW']        = 'YES';
+                $data['PROCESS_NOW_AMOUNT'] = intval( floatval( $product_data['ps2_process_now_amount'][0] ) * 100 );
             } else {
-                // Product Price set to PROCESS_NOW_AMOUNT
-                $data['AMOUNT']             = $specify_amount_value;
-                $data['PROCESS_NOW_AMOUNT'] = $order->get_total() * 100;
+                $data['PROCESS_NOW']        = 'NO';
+                $data['PROCESS_NOW_AMOUNT'] = '';
             }
         } else {
-            // Specify Amount is disabled
-            $data['PROCESS_NOW_AMOUNT'] = $order->get_total() * 100;
+            // Processing subscription
+            $data['SUBS_START_DATE'] = date( 'Y-m-d', $order->get_date_created()->getOffsetTimestamp() );
+
+            $data['SUBS_END_DATE']  = date( 'Y-m-d', strtotime( $this->settings['subsenddate'] ) );
+            $data['SUBS_FREQUENCY'] = $this->settings['frequency'];
+
+            $data['PROCESS_NOW'] = 'YES';
+            if ( $this->settings['specify_amount'] == 'yes' ) {
+                // Specify Amount is enabled
+                $specify_amount_value = $this->settings['specify_amount_value'];
+
+                if ( $this->settings['product_price'] == 'amount' ) {
+                    // Product Price set to AMOUNT
+                    $data['AMOUNT']             = $order->get_total() * 100;
+                    $data['PROCESS_NOW_AMOUNT'] = $specify_amount_value;
+                } else {
+                    // Product Price set to PROCESS_NOW_AMOUNT
+                    $data['AMOUNT']             = $specify_amount_value;
+                    $data['PROCESS_NOW_AMOUNT'] = $order->get_total() * 100;
+                }
+            } else {
+                // Specify Amount is disabled
+                $data['PROCESS_NOW_AMOUNT'] = $order->get_total() * 100;
+            }
         }
 
         $checksum         = md5( implode( '|', $data ) . '|' . $this->encryption_key );
@@ -547,11 +571,11 @@ class WC_Gateway_PaySubs2 extends WC_Payment_Gateway
     /**
      * Generate the PaySubs2 button link.
      *
-     * @since 1.0.0
-     *
      * @param $order_id
      *
      * @return string
+     * @since 1.0.0
+     *
      */
     public function generate_paysubs2_form( $order_id )
     {
@@ -612,11 +636,11 @@ HTML;
     /**
      * Process the payment and return the result.
      *
-     * @since 1.0.0
-     *
      * @param int $order_id
      *
      * @return array
+     * @since 1.0.0
+     *
      */
     public function process_payment( $order_id )
     {
@@ -641,9 +665,9 @@ HTML;
      *
      * Display text and a button to direct the customer to PaySubs2.
      *
+     * @param $order
      * @since 1.0.0
      *
-     * @param $order
      */
     public function receipt_page( $order )
     {
@@ -685,8 +709,23 @@ HTML;
                             echo '<script>window.top.location.href="' . $redirect_link . '";</script>';
                         }
                         exit;
-                    } else {
+                    } elseif ( $_POST['TRANSACTION_STATUS'] == 5 ) {
+                        //Repeats successfully loaded
+                        $order->payment_complete();
+                        $order->add_order_note( __( 'Response via Redirect, Repeat transactions successful', 'woocommerce' ) );
 
+                        // Empty the cart
+                        $woocommerce->cart->empty_cart();
+                        if ( $this->settings['payment_type'] == 'redirect' ) {
+                            wp_redirect( $this->get_return_url( $order ) );
+                        } else {
+
+                            $redirect_link = $this->get_return_url( $order );
+
+                            echo '<script>window.top.location.href="' . $redirect_link . '";</script>';
+                        }
+                        exit;
+                    } else {
                         $order->add_order_note( 'Response via Redirect, Transaction declined.' . '<br/>' );
                         if ( !$order->has_status( 'failed' ) ) {
                             $order->update_status( 'failed' );
@@ -753,4 +792,5 @@ HTML;
             error_log( $message );
         }
     }
+
 }
